@@ -18,4 +18,27 @@
 
 - vi.mock() 사용
 - 각 테스트의 독립성과 안정성을 보장하기 위해 teardown으로 모킹을 초기화해야함
+
   - resetAllMocks, clearAllMocks, restoreAllMocks
+
+- api를 목킹하는 예제
+
+```code
+import * as api from '../services/api';
+
+vi.mock('../services/api', () => {
+  fetchUser: vi.fn(),
+})
+
+beforeEach(() => {vi.resetAllMocks()});
+
+it('should return a user profile with uppercase name', async () => {
+  vi.spyOn(api, 'fetchUser').mockResolvedValue({ id: '123', name: 'sanghun'});
+
+  const user = await getUserProfile('123');
+  expect(user).toEqual({id: '123', name: 'SANGHUN'});
+
+  expect(api.fetchUser).toHaveBeenCalledTimes(1);
+  expect(api.fetchUser).toHaveBeenCalledWith('123');
+})
+```
