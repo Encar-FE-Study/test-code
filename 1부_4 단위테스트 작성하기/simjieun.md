@@ -106,3 +106,104 @@ it("훅의 toggleIsModalOpened()를 호출하면 isModalOpened 상태가 toggle�
 - 테스트 환경에서는 컴포넌트의 렌더링, 업데이트 결과를 JS Dom에 반영할때 반드시 사용해야 한다.
 - React Testing Library의 render함수와 user-event는 내부적으로 act 함수를 호출하기 때
   문에 편리하게 테스트 코드 작성이 가능했다.
+
+# 4. 타이머 테스트
+
+```javascript
+// 테스트 코드는 비동기 타이머와 무관하게 동기적으로 실행
+// -> 비동기 함수가 실행되기 전에 단언이 실행됨
+// 타이머 모킹!
+describe("debounce", () => {
+  // 타이머 모킹 -> 0.3초 흐른것으로 타이머 조작 -> spy 함수 호출 확인
+  beforeEach(() => {
+    // teardown에서 모킹 초기화 -> 다른 테스트에 영향이 없어야함
+
+    // 타이머 모킹도 초기화 필수!
+    // 3rd 파티 라이브러리, 전역의 teardown에서 타이머에 의존하는 로직 -> fakeTimer로 인해 제대로 동작하지 않을 수 있음
+    vi.useFakeTimers();
+
+    // 시간은 흐리기 때문에 매일 달라짐
+    // -> 테스트 당시의 시간에 의존하는 테스트의 경우 시간을 고정하지 않으면 테스트가 깨질 수 있다.
+    // -> setSystemTime으로 시간을 고정하면 일관된 환경에서 테스트 가능
+    vi.setSystemTime(new Date("2025-02-17"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("특정 시간이 지난 후 함수가 호출된다.", () => {
+    const spy = vi.fn();
+
+    const debounceFn = debounce(spy, 300);
+
+    debounceFn();
+
+    vi.advanceTimersByTime(300);
+
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it("연이어 호출해도 마지막 호출 기준으로 지정된 타이머 시간이 지난 경우에만 함수가 호출된다.", () => {
+    const spy = vi.fn();
+
+    const debounceFn = debounce(spy, 300);
+
+    // 최초 호출
+    debounceFn();
+
+    // 최초 호출 후 0.2초 후 호출
+    vi.advanceTimersByTime(200);
+    debounceFn();
+
+    // 두번째 호출 후 0.1초 후 호출
+    vi.advanceTimersByTime(100);
+    debounceFn();
+
+    // 세번째 호출 후 0.2초 후 호출
+    vi.advanceTimersByTime(200);
+    debounceFn();
+
+    // 네번째 호출 후 0.3초 후 호출
+    vi.advanceTimersByTime(300);
+    debounceFn();
+
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+- 타이머를 원하는대로 제어하기 위해서는 타이머 모킹이 필요하다.
+- useFakeTimers()를 통해 타이머를 모킹할 수 있으며, advanceTimersByTime()을 통해 시간이 흐른것 처럼 제어할 수 있다.
+- setSystemTime()을 통해 테스트가 구동되는 현재 시간을 정의할 수 있다.
+
+# 5. userEvent를 사용한 사용자 상호작용 테스트
+
+## fireEvent
+
+- @testing-library/react 모듈에 내장되어 제공
+- 특정 요소에서 원하는 이벤트만 쉽게 발생시킬 수 있음
+
+## fireEvent vs userEvent
+
+- fireEvent는 DOM이벤트만 발생시키는 반면, userEvent는 다양한 상호 작용을 시뮬레이션 할 수 있음
+  - 클릭 이벤트가 발생한다면.. pointerdown, mousedown, pointerup, mouseup, click,
+    focus가 연쇄적으로 발생
+  - 실제 상황처럼 disabled된 버튼이나 인풋 입력이 불가능함
+- 테스트 코드 작성 시에는 userEvent를 활용해 실제 상황과 유사한 코드로 테스트의 신뢰성을 높이자
+- userEvent에서 지원하지 않는 부분이 있을 때, fireEvent활용을 고민하자.
+
+```javascript
+fireEvent.scroll(container, {
+  target: {
+    scrollTop: 10000,
+  },
+});
+```
+
+# 5. 단위테스트의 한계
+
+- 단위테스트는 컴포넌트, 커스텀 훅, 공통 유틸처럼 다른 모듈에 대한
+  의존성이 거의 없을 때, 모듈 자체만으로 작지만 독립적인 역할을 할 때 효율적으로 검증할 수 있다.
+- 단위 테스트에서 검증하지 못하는 부분을 통합·E2E·시각적 테스트 등 다양한 테스트로 보강해야 한다.
+- 통합 테스트에서는 여러 모듈이 조합되었을 때 비즈니스 로직을 검증할 수 있고, 비즈니스 로직 기준으로 여러 컴포넌트들 간의 상호 작용을 한번에 검증할 수 있다.
