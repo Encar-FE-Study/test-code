@@ -10,8 +10,6 @@
 2. Act: 테스트할 동작 발생 (사용자 인터랙션)
 3. Assert: 올바른 동작이 실행 되었는지 또는 변경사항 검증하기
 
-![AAA에 따른 TextField 컴포넌트 테스트](/images/donghun/image.png)
-
 > # 테스트 환경과 매처(Machter)
 
 ### vitest

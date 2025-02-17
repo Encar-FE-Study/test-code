@@ -15,6 +15,8 @@
 - 실제 모듈과 동일하게 구현하게되면 큰 비용이 든다.
 - 모킹의 남용은 신뢰성을 낮춘다.
 
+### EmptyNotice TestCode
+
 ```js
 /* eslint-disable prettier/prettier */
 import { screen } from "@testing-library/react";
@@ -38,7 +40,11 @@ it('"홈으로 가기" 링크를 클릭할경우 "/"경로로 navigate함수가 
   await user.click(screen.getByText("홈으로 가기"));
   expect(navigateFn).toHaveBeenNthCalledWith(1, "/");
 });
+```
 
+### ErrorPage TestCode
+
+```js
 /* eslint-disable prettier/prettier */
 import { screen } from "@testing-library/react";
 import React from "react";
@@ -59,7 +65,11 @@ it('"뒤로 이동" 버튼 클릭시 뒤로 이동하는 navigate(-1) 함수가 
   await user.click(button);
   expect(navigateFn).toHaveBeenNthCalledWith(1, -1);
 });
+```
 
+### NotFoundPage TestCode
+
+```js
 /* eslint-disable prettier/prettier */
 import { screen } from "@testing-library/react";
 import React from "react";
