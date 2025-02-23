@@ -112,3 +112,29 @@ vi.stubGlobal('alert', alertSpy);
 ```
 
 - 요소가 dom에 존재하지 않는지에 대해서 단언할 때는 **getByText 대신 queryByText**를 사용한다.
+
+## 4.5 msw로 API 모킹하기
+
+- 테스트에서 api 호출 -> 실행시간 증가, 서버 이슈로 인한 테스트 실패
+  - API 응답 모킹 -> 일관된 테스트 환경 구성 가능
+
+### Mock Service Worker (MSW)
+
+- node.js 및 브라우저 환경을 위한 api 모킹 라이브러리
+- BE의 api 규격정도만 받아서 fe에서 api 테스트 가능
+
+## 4.6 RTL 비동기 유틸 함수를 활용한 테스트 작성
+
+- findBy 쿼리는 비동기적으로 동작하는 코드로 인한 요소를 쿼리할 때 사용
+  - api 호출과 같은 비동기 처리로 인한 변화를 감지할 때 사용
+  - 반환값은 Promise이기 때문에 await, then 사용
+- waitFor를 사용해도 작성 가능하지만, findBy- 쿼리 역시 내부적으로 waitFor 사용
+
+```javascript
+// findBy- 쿼리 사용
+const productCards = await screen.findAllByTestId('product-card');
+// waitFor 사용
+const productCards = await waitFor(() => screen.getAllByTestId('product-card'));
+```
+
+- handlers.js
