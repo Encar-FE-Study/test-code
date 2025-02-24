@@ -56,4 +56,300 @@
 
 # 3. 상태 관리 모킹
 
-- 행사팀 하기 싫다...
+- zustand를 사용하여 상태관리를 테스트 한다.
+- 원하는 상태로 통합 테스트를 하기 위해 zustand 모킹 필요하다.
+- __mocks__/zustand.js를 통해 자동 모킹을 적용해 스토어를 초기화한다.
+
+# 4. 통합 테스트 작성하기 - 상태 관리 모킹
+```javascript
+import { screen, within } from '@testing-library/react';
+import React from 'react';
+
+import ProductInfoTable from '@/pages/cart/components/ProductInfoTable';
+import {
+  mockUseCartStore,
+  mockUseUserStore,
+} from '@/utils/test/mockZustandStore';
+import render from '@/utils/test/render';
+
+beforeEach(() => {
+  mockUseUserStore({ user: { id: 10 } });
+  mockUseCartStore({
+    cart: {
+      6: {
+        id: 6,
+        title: 'Handmade Cotton Fish',
+        price: 809,
+        description:
+          'The slim & simple Maple Gaming Keyboard from Dev Byte comes with a sleek body and 7- Color RGB LED Back-lighting for smart functionality',
+        images: [
+          'https://user-images.githubusercontent.com/35371660/230712070-afa23da8-1bda-4cc4-9a59-50a263ee629f.png',
+          'https://user-images.githubusercontent.com/35371660/230711992-01a1a621-cb3d-44a7-b499-20e8d0e1a4bc.png',
+          'https://user-images.githubusercontent.com/35371660/230712056-2c468ef4-45c9-4bad-b379-a9a19d9b79a9.png',
+        ],
+        count: 3,
+      },
+      7: {
+        id: 7,
+        title: 'Awesome Concrete Shirt',
+        price: 442,
+        description:
+          'The Nagasaki Lander is the trademarked name of several series of Nagasaki sport bikes, that started with the 1984 ABC800J',
+        images: [
+          'https://user-images.githubusercontent.com/35371660/230762100-b119d836-3c5b-4980-9846-b7d32ea4a08f.png',
+          'https://user-images.githubusercontent.com/35371660/230762118-46d965ab-7ea8-4e8a-9c0f-3ed90f96e1cd.png',
+          'https://user-images.githubusercontent.com/35371660/230762139-002578da-092d-4f34-8cae-2cf3b0dfabe9.png',
+        ],
+        count: 4,
+      },
+    },
+  });
+});
+
+it('장바구니에 포함된 아이템들의 이름, 수량, 합계가 제대로 노출된다', async () => {
+  await render(<ProductInfoTable />);
+
+  const [firstItem, secondItem] = screen.getAllByRole('row');
+
+  expect(
+    within(firstItem).getByText('Handmade Cotton Fish'),
+  ).toBeInTheDocument();
+  expect(within(firstItem).getByRole('textbox')).toHaveValue('3');
+  expect(within(firstItem).getByText('$2,427.00')).toBeInTheDocument();
+
+  expect(
+    within(secondItem).getByText('Awesome Concrete Shirt'),
+  ).toBeInTheDocument();
+  expect(within(secondItem).getByRole('textbox')).toHaveValue('4');
+  expect(within(secondItem).getByText('$1,768.00')).toBeInTheDocument();
+});
+
+it('특정 아이템의 수량이 변경되었을 때 값이 재계산되어 올바르게 업데이트 된다', async () => {
+  const { user } = await render(<ProductInfoTable />);
+  const [firstItem] = screen.getAllByRole('row');
+
+  const input = within(firstItem).getByRole('textbox');
+
+  await user.clear(input);
+  await user.type(input, '5');
+
+  // 2427 + 809 * 2 = 4045
+  expect(screen.getByText('$4,045.00')).toBeInTheDocument();
+});
+
+it('특정 아이템의 수량이 1000개로 변경될 경우 "최대 999개 까지 가능합니다!"라고 경고 문구가 노출된다', async () => {
+  const alertSpy = vi.fn();
+
+  // window.alert -> alertSpy로 대체
+  vi.stubGlobal('alert', alertSpy);
+
+  const { user } = await render(<ProductInfoTable />);
+  const [firstItem] = screen.getAllByRole('row');
+
+  const input = within(firstItem).getByRole('textbox');
+
+  await user.clear(input);
+  await user.type(input, '1000');
+
+  expect(alertSpy).toHaveBeenNthCalledWith(1, '최대 999개 까지 가능합니다!');
+});
+
+it('특정 아이템의 삭제 버튼을 클릭할 경우 해당 아이템이 사라진다', async () => {
+  const { user } = await render(<ProductInfoTable />);
+
+  const [, secondItem] = screen.getAllByRole('row');
+  const deleteButton = within(secondItem).getByRole('button');
+
+  expect(screen.getByText('Awesome Concrete Shirt')).toBeInTheDocument();
+
+  await user.click(deleteButton);
+
+  expect(screen.queryByText('Awesome Concrete Shirt')).not.toBeInTheDocument();
+});
+
+```
+
+# 5. msw로 API 모킹하기
+- MSW : Node.js 및 브라우저 환경을 위한 API 모킹 라이브러리이다. 
+- 브라우저에서는 서비스 워커를 사용하여 모킹한다.
+- Node.js 환경에서는 내부적으로 XHR, fetch 등의 요청을 가로채는 인터셉터를 사용한다.
+- setup과 teardown을 사용해 테스트 실행 전, 후에 API를 모킹한다.
+
+# 6. RTL 비동기 유틸 함수를 통한 노출 테스트 작성
+- findBy
+  - 쿼리가 통과하거나 시간 초과될 때 까지 재시도한다.(1초 동안 50ms간격으로)
+  - API 호출과 같은 비동기 처리로 인한 변화를 감지해야 할 때 사용하기 좋다.
+  - RTL에서는 findBy같은 비동기 메서드의 반환값은 Promise이기에, 해당 요소를 사용하려면 await이나 then을 사용해야 한다.
+```javascript
+import { screen, within } from '@testing-library/react';
+import React from 'react';
+
+import data from '@/__mocks__/response/products.json';
+import ProductList from '@/pages/home/components/ProductList';
+import { formatPrice } from '@/utils/formatter';
+import {
+  mockUseUserStore,
+  mockUseCartStore,
+} from '@/utils/test/mockZustandStore';
+import render from '@/utils/test/render';
+
+const PRODUCT_PAGE_LIMIT = 5;
+
+const navigateFn = vi.fn();
+
+vi.mock('react-router-dom', async () => {
+  const original = await vi.importActual('react-router-dom');
+  return {
+    ...original,
+    useNavigate: () => navigateFn,
+    useLocation: () => ({
+      state: {
+        prevPath: 'prevPath',
+      },
+    }),
+  };
+});
+
+it('로딩이 완료된 경우 상품 리스트가 제대로 모두 노출된다', async () => {
+  await render(<ProductList limit={PRODUCT_PAGE_LIMIT} />);
+
+  // 1초 동안 50ms 마다 요소가 있는지 조회
+  const productCards = await screen.findAllByTestId('product-card');
+
+  expect(productCards).toHaveLength(PRODUCT_PAGE_LIMIT);
+
+  productCards.forEach((el, index) => {
+    const productCard = within(el);
+    const product = data.products[index];
+
+    expect(productCard.getByText(product.title)).toBeInTheDocument();
+    expect(productCard.getByText(product.category.name)).toBeInTheDocument();
+    expect(
+      productCard.getByText(formatPrice(product.price)),
+    ).toBeInTheDocument();
+    expect(
+      productCard.getByRole('button', { name: '장바구니' }),
+    ).toBeInTheDocument();
+    expect(
+      productCard.getByRole('button', { name: '구매' }),
+    ).toBeInTheDocument();
+  });
+});
+
+it('보여줄 상품 리스트가 더 있는 경우 show more 버튼이 노출되며, 버튼을 누르면 상품 리스트를 더 가져온다.', async () => {
+  const { user } = await render(<ProductList limit={PRODUCT_PAGE_LIMIT} />);
+
+  // show more 버튼의 노출 여부를 정확하게 판단하기 위해
+    // findBy 쿼리를 사용하여 먼저 첫 페이지에 해당하는 상품 목록이 렌더링되는 것을 기다려야 함.
+  await screen.findAllByTestId('product-card');
+
+  expect(screen.getByText('Show more')).toBeInTheDocument();
+
+  const moreBtn = screen.getByText('Show more');
+  await user.click(moreBtn);
+
+  expect(await screen.findAllByTestId('product-card')).toHaveLength(
+    PRODUCT_PAGE_LIMIT * 2,
+  );
+});
+
+it('보여줄 상품 리스트가 없는 경우 show more 버튼이 노출되지 않는다.', async () => {
+  await render(<ProductList limit={20} />);
+
+  await screen.findAllByTestId('product-card');
+
+  expect(screen.queryByText('Show more')).not.toBeInTheDocument();
+});
+
+describe('로그인 상태일 경우', () => {
+  beforeEach(() => {
+    mockUseUserStore({ isLogin: true, user: { id: 10 } });
+  });
+
+  it('구매 버튼 클릭시 addCartItem 메서드가 호출되며, "/cart" 경로로 navigate 함수가 호출된다.', async () => {
+    const addCartItemFn = vi.fn();
+    mockUseCartStore({ addCartItem: addCartItemFn });
+
+    const { user } = await render(<ProductList limit={PRODUCT_PAGE_LIMIT} />);
+
+    await screen.findAllByTestId('product-card');
+
+    // 첫번째 상품을 대상으로 검증한다.
+    const productIndex = 0;
+    await user.click(
+      screen.getAllByRole('button', { name: '구매' })[productIndex],
+    );
+
+    expect(addCartItemFn).toHaveBeenNthCalledWith(
+      1,
+      data.products[productIndex],
+      10,
+      1,
+    );
+    expect(navigateFn).toHaveBeenNthCalledWith(1, '/cart');
+  });
+
+  it('장바구니 버튼 클릭시 "장바구니 추가 완료!" toast를 노출하며, addCartItem 메서드가 호출된다.', async () => {
+    const addCartItemFn = vi.fn();
+    mockUseCartStore({ addCartItem: addCartItemFn });
+
+    const { user } = await render(<ProductList limit={PRODUCT_PAGE_LIMIT} />);
+
+    await screen.findAllByTestId('product-card');
+
+    // 첫번째 상품을 대상으로 검증한다.
+    const productIndex = 0;
+    const product = data.products[productIndex];
+    await user.click(
+      screen.getAllByRole('button', { name: '장바구니' })[productIndex],
+    );
+
+    expect(addCartItemFn).toHaveBeenNthCalledWith(1, product, 10, 1);
+    expect(
+      screen.getByText(`${product.title} 장바구니 추가 완료!`),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('로그인이 되어 있지 않은 경우', () => {
+  it('구매 버튼 클릭시 "/login" 경로로 navigate 함수가 호출된다.', async () => {
+    const { user } = await render(<ProductList limit={PRODUCT_PAGE_LIMIT} />);
+
+    await screen.findAllByTestId('product-card');
+
+    // 첫번째 상품을 대상으로 검증한다.
+    const productIndex = 0;
+    await user.click(
+      screen.getAllByRole('button', { name: '구매' })[productIndex],
+    );
+
+    expect(navigateFn).toHaveBeenNthCalledWith(1, '/login');
+  });
+
+  it('장바구니 버튼 클릭시 "/login" 경로로 navigate 함수가 호출된다.', async () => {
+    const { user } = await render(<ProductList limit={PRODUCT_PAGE_LIMIT} />);
+
+    await screen.findAllByTestId('product-card');
+
+    // 첫번째 상품을 대상으로 검증한다.
+    const productIndex = 0;
+    await user.click(
+      screen.getAllByRole('button', { name: '장바구니' })[productIndex],
+    );
+
+    expect(navigateFn).toHaveBeenNthCalledWith(1, '/login');
+  });
+});
+
+it('상품 클릭시 "/product/:productId" 경로로 navigate 함수가 호출된다.', async () => {
+  const { user } = await render(<ProductList limit={PRODUCT_PAGE_LIMIT} />);
+
+  const [firstProduct] = await screen.findAllByTestId('product-card');
+
+  // 첫번째 상품을 대상으로 검증한다.
+  await user.click(firstProduct);
+
+  expect(navigateFn).toHaveBeenNthCalledWith(1, '/product/6');
+});
+
+```
