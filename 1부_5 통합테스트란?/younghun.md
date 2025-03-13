@@ -27,7 +27,9 @@
 
 ## 테스팅 할 때 중첩은 피하세요
 - [avoid nesting when you're testing](https://jaehyeon48.github.io/testing/avoid-nesting-when-youre-testing)
-    - 간단한 컴포넌트의 경우 추상화를 최대한 제거하는 것
+    - 간단한 컴포넌트의 경우 추상화를 최대한 제거하는 것(Over-abstraction 경계)
+    - 단순히 코드 재사용을 위해 befareAll, afterall 같은 유틸리티를 사용하지 말 것
+    - 테스트를 실패해도 클린업 할 수 있도록 afterEach 사용할 것
 - [AHA (Avoid Hasty Abstractions) 적용하기](https://kentcdodds.com/blog/aha-testing)
     - 잘못된 추상화보단 중복을 허용하고, 변경에 대한 최적화를 먼저 해야 함 (prefer duplication over the wrong abstraction and optimize for change first)
     - ANA(Absolutely No Abstraction)
