@@ -33,8 +33,34 @@ Cypress는 이 쿼리를 실패하면 알아서 재시도 함 (ex: DOM 아직 �
 
 ### 공통 목적
 
-- 반복 로직을 Cypress 명령으로 분리해 재사용성 높이기
-- 테스트 가독성, 유지보수성 향상
+- 반복 로직을 Cypress 명령으로 분리해 재사용성/유지보수성 높이기
+- 로직을 묶어서 추상화할 수 있음
+```
+커맨드
+Cypress.Commands.addQuery('getProductCardByIndex', (index) => {
+  return () => {
+    return Cypress.$('.product-card').eq(index);
+  };
+});
+
+cy.get('.product-list .product-card').eq(3)를 매번 작성하려면 귀찮음
+-> cy.getProductCardByIndex(3)로 처리 가능
+-> getProductCardByIndex(1) 이 명령은 DOM에서 해당 요소를 찾아서 즉시 리턴 / 자동 재시도 됨
+
+쿼리
+
+Cypress.Commands.add('login', (username, password) => {
+  cy.get('#username').type(username);
+  cy.get('#password').type(password);
+  cy.get('form').submit();
+});
+
+cy.login(어쩌구,저쩌구)
+자동 재시도 안 됨 → cy.get() 자체는 재시도되지만, 전체 흐름 자체는 한 번 실행
+
+```
+
+
 
 | 항목                   | 커스텀 쿼리 (Custom Query)    | 커스텀 커맨드 (Custom Command) |
 | ---------------------- | ----------------------------- | ------------------------------ |
@@ -47,6 +73,44 @@ Cypress는 이 쿼리를 실패하면 알아서 재시도 함 (ex: DOM 아직 �
 | 사용 예                | `getProductCardByIndex`       | `login`, `addToCart` 등        |
 
 ---
+
+## 다른 테스트 환경에서는
+### RTL
+```
+Cypress처럼 “명령어 등록”은 없지만, 유틸 함수로 추상화하는 방식으로 처리
+
+test('로그인할 수 있다', async () => {
+  render(<LoginForm />);
+
+  await userEvent.type(screen.getByLabelText(/아이디/i), 'testuser');
+  await userEvent.type(screen.getByLabelText(/비밀번호/i), '1234');
+  await userEvent.click(screen.getByRole('button', { name: /로그인/i }));
+
+  expect(screen.getByText(/환영합니다/i)).toBeInTheDocument();
+});
+=> 반복되는 로직이 생기면 Cypress처럼 커맨드를 등록할 순 없지만
+
+유틸함수로 추상화
+// test-utils/loginHelper.ts
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+export async function login(username: string, password: string) {
+  await userEvent.type(screen.getByLabelText(/아이디/i), username);
+  await userEvent.type(screen.getByLabelText(/비밀번호/i), password);
+  await userEvent.click(screen.getByRole('button', { name: /로그인/i }));
+}
+
+및 재사용 가능
+import { login } from '../test-utils/loginHelper';
+
+test('유저 로그인 시 대시보드 이동', async () => {
+  render(<LoginPage />);
+  await login('tester', 'pass');
+  expect(screen.getByText(/대시보드/i)).toBeInTheDocument();
+});
+
+```
 
 # 테스트 더블
 
