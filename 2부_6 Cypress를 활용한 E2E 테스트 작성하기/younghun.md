@@ -12,7 +12,7 @@
 ## E2E 테스트 작성하기
 - 특정 파일에서만 반복되는 단언이나 커맨드 별도 함수로 추상화하여 분리해두면 좋음
 - 커스텀 쿼리(ex. getProductCardByIndex) .커스텀 커맨드(ex. assertUrl)
-- cy.session 활용하여 쿠키, local stroage, session storage 활용하여 로그인 유지 처리
+- cy.session 활용하여 쿠키, local stroage, session storage 활용하여 로그인 유지 처리
 
 ## 서버 요청 가로채기
 - 테스트 도중 데이터 생성 시 삭제까지 같이 검증하는 것이 좋음
